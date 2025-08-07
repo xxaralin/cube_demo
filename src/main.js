@@ -21,11 +21,11 @@ const modules = [];
 let selectedModuleIndex = 0;
 
 const sunLight = new THREE.DirectionalLight(0xffffff, 1);
-sunLight.position.set(5, 10, 7); // yukarıdan ışık
+sunLight.position.set(5, 10, 7); 
 sunLight.castShadow = true;
 scene.add(sunLight);
 
-// GROUND PLANE
+// ground
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(20, 20),
   new THREE.MeshStandardMaterial({ color: 0x888888 })
@@ -38,13 +38,13 @@ scene.add(ground);
 
 // Initialize OrbitControls
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true; // yumuşak hareket için (opsiyonel)
 
 //sliders
 const widthSlider = document.getElementById('widthSlider');
 const heightSlider = document.getElementById('heightSlider');
 const depthSlider = document.getElementById('depthSlider');
 
+//slider values
 const widthSliderValueContainer = document.getElementById('widthSliderValueContainer');
 const heightSliderValueContainer = document.getElementById('heightSliderValueContainer');
 const depthSliderValueContainer = document.getElementById('depthSliderValueContainer');
@@ -52,7 +52,7 @@ const depthSliderValueContainer = document.getElementById('depthSliderValueConta
 //listeners
 widthSlider.addEventListener('input', () => {
   updateCubeGeometry();
-  maybeAddModulesFromTotalWidth();
+  checkForAdditionalCube();
   widthSliderValueContainer.textContent = `${widthSlider.value} cm`;
 });
 heightSlider.addEventListener('input', () => {
@@ -65,13 +65,15 @@ depthSlider.addEventListener('input', () => {
 });
 
 //fonksiyonlar
-
+/** 
+ * is called to create new modul for initial module and width related changes
+*/
 function createModule(width, height, depth) {
   const color = Math.random() * 0xffffff;
   const geometry = new THREE.BoxGeometry(width, height, depth);
   const material = new THREE.MeshPhongMaterial({
     color,
-    shininess: 60,   // parlama etkisi
+    shininess: 60,
     specular: 0x222222
   });
   const mesh = new THREE.Mesh(geometry, material);
@@ -79,36 +81,41 @@ function createModule(width, height, depth) {
   return { width, height, depth, mesh, originalColor: color };
 }
 
+/**
+ * is called with every slider change,
+ * no scaling creates and sets the new geometry
+*/
 function updateCubeGeometry() {
   const selected = modules[selectedModuleIndex]; 
   if (!selected) return;
 
-  const newWidth = parseInt(widthSlider.value);
-  // Clamp width to max 60 cm (0.6 units)
-  selected.width = Math.min(newWidth, 60) / 100;
+  selected.width = Math.min(parseInt(widthSlider.value), 60) / 100;
   selected.height = parseInt(heightSlider.value) / 100;
   selected.depth = parseInt(depthSlider.value) / 100;
 
-  // Yeni geometry oluştur
   const newGeometry = new THREE.BoxGeometry(selected.width, selected.height, selected.depth );
   selected.mesh.geometry.dispose();
   selected.mesh.geometry = newGeometry;
   renderModules();
 }
 
+/**sets modules in array in correct positions
+ * (right next to eachother and the same dimentions) 
+*/
 function renderModules() {
   let xOffset = 0;
   modules.forEach((mod) => {
     mod.mesh.position.set(xOffset + mod.width / 2, mod.height / 2, mod.depth / 2);
     xOffset += mod.width;
 
-    // sadece ilk kez sahneye ekliyorsak ekle
     if (!scene.children.includes(mod.mesh)) {
       scene.add(mod.mesh);
     }
   });
 }
-
+/**
+ * when selected module changes it adjusts the sliders to the selected modules dimentions
+ */
 function updateSlidersFromSelectedModule() {
   const selected = modules[selectedModuleIndex];
   if (parseInt(widthSlider.value) !== selected.width * 100)
@@ -123,33 +130,35 @@ function updateSlidersFromSelectedModule() {
   depthSliderValueContainer.textContent = `${depthSlider.value} cm`;
 }
 
-function maybeAddModulesFromTotalWidth() {
+/**checks if the selected module is on the end(middle ones dont trigger another module creation. each module can trigger 1 module) and widht is above 60
+ * with right conditions another cube is added with same dimentions as the originator(width is fixed to 60 cm) 
+ */
+function checkForAdditionalCube() {
   const selected = modules[selectedModuleIndex];
   if (!selected) return;
 
-  const newWidth = parseInt(widthSlider.value);
-
-  // Add new module only if this is the last one and width > 60
   const isLast = selectedModuleIndex === modules.length - 1;
-  const widthExceeds = newWidth > 60;
+  const widthExceeds =  parseInt(widthSlider.value) > 60;
 
   if (isLast && widthExceeds) {
     const height = parseInt(heightSlider.value) / 100;
     const depth = parseInt(depthSlider.value) / 100;
 
-    const newModule = createModule(0.6, height, depth); // fixed 60cm width
+    const newModule = createModule(0.6, height, depth); 
     modules.push(newModule);
-    scene.add(newModule.mesh);
-    selected.width = 0.6; // cap current module at 60cm
+    selected.width = 0.6; 
   }
-
   renderModules();
 }
 
+/**
+ * 
+ * gets the selected modules, updates the selectedModuleIndex, changes the color of the selected module to orange, the unselected to a random color
+ * calls the method to update the sliders
+ */
 function onModuleClick(intersects) {
   const clickedMesh = intersects[0].object;
   const index = modules.findIndex(m => m.mesh === clickedMesh);
-
   if (index !== -1) {
     selectedModuleIndex = index;
     modules.forEach((mod, i) => {
@@ -157,10 +166,13 @@ function onModuleClick(intersects) {
     });
     updateSlidersFromSelectedModule();
     renderModules();
-    console.log("Seçilen modül:", index);
   }
 }
 
+/**
+ * sends a ray from camera to mouse position if it h,ts a mesh, a module is clicked
+ * calls onClick function for selected mesh or module
+ */
 function setupRaycasterClick() {
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2();
@@ -177,9 +189,9 @@ function setupRaycasterClick() {
     }
   });
 }
-//başlangıç
 
-modules.push(createModule(0.6, 0.6, 0.6)); // ilk küp
+//initial setup
+modules.push(createModule(0.6, 0.6, 0.6));
 scene.add(modules[0].mesh);
 renderModules();
 updateSlidersFromSelectedModule();
@@ -187,7 +199,7 @@ setupRaycasterClick();
 
 function animate() {
   requestAnimationFrame(animate);
-  controls.update(); // çok önemli!
+  controls.update(); 
   renderer.render(scene, camera);
 }
 animate();
